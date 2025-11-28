@@ -3,34 +3,11 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import os
-import requests
 import time
-from openpyxl import load_workbook
-from openpyxl.formatting.rule import ColorScaleRule
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ============================================================
-# TELEGRAM ALERTS
-# ============================================================
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-def telegram(msg):
-    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
-        try:
-            requests.get(
-                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                params={"chat_id": TELEGRAM_CHAT_ID, "text": msg}
-            )
-        except:
-            pass
-
-telegram("📡 Stock Engine Started (GitHub Actions)")
-
-
-# ============================================================
+# ------------------------------------------------------------
 # % CHANGE FUNCTION
-# ============================================================
+# ------------------------------------------------------------
 def pct_change(df, days):
     if len(df) <= days:
         return np.nan
@@ -40,62 +17,26 @@ def pct_change(df, days):
         return np.nan
     return ((end - start) / start) * 100
 
-
-# ============================================================
-# RAW DATA CACHE
-# ============================================================
-CACHE_FOLDER = "raw_data"
-os.makedirs(CACHE_FOLDER, exist_ok=True)
-
-def cache_path(sym):
-    return os.path.join(CACHE_FOLDER, f"{sym}.csv")
-
-def load_from_cache(sym):
-    fp = cache_path(sym)
-    if os.path.exists(fp):
-        try:
-            return pd.read_csv(fp, index_col=0, parse_dates=True)
-        except:
-            return None
-    return None
-
-def save_to_cache(sym, df):
-    df.to_csv(cache_path(sym))
-
-
-# ============================================================
-# DOWNLOAD 1 STOCK (CACHE + RETRIES + FAIL REMOVAL)
-# ============================================================
+# ------------------------------------------------------------
+# DOWNLOAD STOCK (simple + stable)
+# ------------------------------------------------------------
 def download_stock(sym):
-    cached = load_from_cache(sym)
-    if cached is not None:
-        return sym, cached, "cache"
+    try:
+        df = yf.download(sym, period="5y", interval="1d", progress=False)
+        if df is not None and not df.empty:
+            df.to_csv(f"raw_data/{sym}.csv")
+            return sym, df
+    except:
+        pass
+    return sym, None
 
-    fails = 0
-    for attempt in range(3):
-        try:
-            df = yf.download(sym, period="5y", interval="1d", progress=False)
-            if df is not None and not df.empty:
-                save_to_cache(sym, df)
-                return sym, df, "fresh"
-        except:
-            pass
-
-        fails += 1
-        time.sleep(1 + attempt)
-
-        if fails == 2:
-            return sym, None, "remove"
-
-    return sym, None, "fail"
-
-
-# ============================================================
-# PROCESS 1 STOCK
-# ============================================================
+# ------------------------------------------------------------
+# PROCESS STOCK → CALCULATE ALL SCORES
+# ------------------------------------------------------------
 def process(sym, df):
     try:
         latest = float(df["Close"].iloc[-1])
+
         out = {
             "Symbol": sym,
             "Latest Price": latest,
@@ -110,19 +51,28 @@ def process(sym, df):
             "change_5y": pct_change(df, 1260),
         }
 
+        # SHORT TERM SCORE (25%)
         out["short_term"] = np.nanmean([
-            out["change_1w"], out["change_1m"], out["change_3m"]
+            out["change_1w"],
+            out["change_1m"],
+            out["change_3m"]
         ])
 
+        # MEDIUM TERM SCORE (30%)
         out["medium_term"] = np.nanmean([
-            out["change_6m"], out["change_1y"]
+            out["change_6m"],
+            out["change_1y"]
         ])
 
+        # LONG TERM SCORE (45%)
         out["long_term"] = np.nanmean([
-            out["change_2y"], out["change_3y"],
-            out["change_4y"], out["change_5y"]
+            out["change_2y"],
+            out["change_3y"],
+            out["change_4y"],
+            out["change_5y"]
         ])
 
+        # COMBINED SCORE
         out["combined_score"] = (
             out["short_term"] * 0.25 +
             out["medium_term"] * 0.30 +
@@ -130,133 +80,64 @@ def process(sym, df):
         )
 
         return out
-    except:
+
+    except Exception:
         return None
 
-
-# ============================================================
-# PROGRESS BAR WITH ETA
-# ============================================================
-def print_progress(done, total, start_time):
-    pct = (done / total) * 100
-    elapsed = time.time() - start_time
-    speed = done / elapsed if elapsed > 0 else 0
-    remaining = (total - done) / speed if speed > 0 else 0
-    bar = "█" * int(pct // 2) + "░" * (50 - int(pct // 2))
-    print(f"\r[{bar}] {pct:5.1f}% | {done}/{total} | ETA: {remaining:4.1f}s", end="")
-
-
-# ============================================================
-# EXCEL COLORING
-# ============================================================
-def apply_color(ws, col_letter, row_count):
-    cell_range = f"{col_letter}2:{col_letter}{row_count}"
-    rule = ColorScaleRule(
-        start_type="min", start_color="FF0000",
-        mid_type="percentile", mid_value=50, mid_color="FFFF00",
-        end_type="max", end_color="00B050"
-    )
-    ws.conditional_formatting.add(cell_range, rule)
-
-
-# ============================================================
-# MAIN ENGINE
-# ============================================================
+# ------------------------------------------------------------
+# MAIN ENGINE (CLEAN + STABLE)
+# ------------------------------------------------------------
 def run_engine():
+
+    os.makedirs("raw_data", exist_ok=True)
+    os.makedirs("output", exist_ok=True)
 
     tickers = pd.read_excel("master_template.xlsx")["Symbol"].dropna().tolist()
 
     results = []
-    removed = []
-    start_time = time.time()
+    for sym in tickers:
+        sym, df = download_stock(sym)
+        if df is not None:
+            out = process(sym, df)
+            if out:
+                results.append(out)
+        time.sleep(0.2)
 
-    telegram(f"⏳ Downloading {len(tickers)} stocks… (multithreaded + ETA)")
-
-    # MULTITHREADED DOWNLOAD
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(download_stock, sym): sym for sym in tickers}
-        done = 0
-        for future in as_completed(futures):
-            sym = futures[future]
-            sym, df, status = future.result()
-            if status == "remove":
-                removed.append(sym)
-            elif df is not None:
-                results.append((sym, df))
-            done += 1
-            print_progress(done, len(tickers), start_time)
-
-    print("\n")
-    telegram(f"📥 Completed Downloading: {len(results)}/{len(tickers)}")
-
-    if removed:
-        telegram(f"⚠️ Auto-removed (failed twice): {', '.join(removed[:10])}…")
-
-    # PROCESS STOCKS
-    rows = []
-    for sym, df in results:
-        out = process(sym, df)
-        if out:
-            rows.append(out)
-
-    master = pd.DataFrame(rows)
+    master = pd.DataFrame(results)
     master = master.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # SAFETY 1: empty master
-    if master.empty:
-        telegram("❌ No valid stock data processed. Aborting cleanly.")
-        return
-
-    # SAFETY 2: Ensure columns exist
-    for col in ["short_term", "medium_term", "long_term"]:
-        if col not in master.columns:
-            master[col] = 0
-
-    if "combined_score" not in master.columns:
-        master["combined_score"] = 0
-
-    # RANKING
+    # RANK BASED ON COMBINED SCORE
     master["Rank"] = master["combined_score"].rank(
-        ascending=False, method="dense"
+        ascending=False,
+        method="dense"
     ).astype(int)
 
-        # OUTPUT
-    os.makedirs("output", exist_ok=True)
+    # ------------------------------------------------------------
+    # OUTPUT SECTION
+    # ------------------------------------------------------------
     now = datetime.now().strftime("%Y%m%d_%H%M")
     outfile = f"output/master_output_{now}.xlsx"
 
     with pd.ExcelWriter(outfile, engine="openpyxl") as writer:
+
         master.to_excel(writer, "Master", index=False)
 
-        if "short_term" in master.columns:
-            master.sort_values("short_term", ascending=False).head(20).to_excel(writer, "Top20_ShortTerm", index=False)
+        master.sort_values("short_term", ascending=False).head(20) \
+            .to_excel(writer, "Top20_ShortTerm", index=False)
 
-        if "medium_term" in master.columns:
-            master.sort_values("medium_term", ascending=False).head(20).to_excel(writer, "Top20_MediumTerm", index=False)
+        master.sort_values("medium_term", ascending=False).head(20) \
+            .to_excel(writer, "Top20_MediumTerm", index=False)
 
-        if "long_term" in master.columns:
-            master.sort_values("long_term", ascending=False).head(20).to_excel(writer, "Top20_LongTerm", index=False)
+        master.sort_values("long_term", ascending=False).head(20) \
+            .to_excel(writer, "Top20_LongTerm", index=False)
 
-        master.sort_values("combined_score", ascending=False).head(5).to_excel(writer, "Star_Top5", index=False)
+        master.sort_values("combined_score", ascending=False).head(5) \
+            .to_excel(writer, "Star_Top5", index=False)
 
-    # COLORING
-    wb = load_workbook(outfile)
-    ws = wb["Master"]
-    rows_count = len(master) + 1
+    print(f"✔ Output created: {outfile}")
 
-    for col in ["C","D","E","F","G","H","I","J","K","L","M","N","O"]:
-        apply_color(ws, col, rows_count)
-
-    wb.save(outfile)
-
-    telegram("✅ Stock Engine Completed Successfully")
-
-
-# ============================================================
+# ------------------------------------------------------------
 # RUN ENGINE
-# ============================================================
-try:
+# ------------------------------------------------------------
+if __name__ == "__main__":
     run_engine()
-except Exception as e:
-    telegram(f"❌ Stock Engine Error: {e}")
-    raise
