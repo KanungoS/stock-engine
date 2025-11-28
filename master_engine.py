@@ -51,17 +51,14 @@ os.makedirs(CACHE_FOLDER, exist_ok=True)
 def cache_path(sym):
     return os.path.join(CACHE_FOLDER, f"{sym}.csv")
 
-
 def load_from_cache(sym):
     fp = cache_path(sym)
     if os.path.exists(fp):
         try:
-            df = pd.read_csv(fp, index_col=0, parse_dates=True)
-            return df
+            return pd.read_csv(fp, index_col=0, parse_dates=True)
         except:
             return None
     return None
-
 
 def save_to_cache(sym, df):
     df.to_csv(cache_path(sym))
@@ -89,7 +86,7 @@ def download_stock(sym):
         time.sleep(1 + attempt)
 
         if fails == 2:
-            return sym, None, "remove"   # auto-remove
+            return sym, None, "remove"  # auto-remove
 
     return sym, None, "fail"
 
@@ -134,6 +131,7 @@ def process(sym, df):
         )
 
         return out
+
     except:
         return None
 
@@ -146,11 +144,9 @@ def print_progress(done, total, start_time):
     elapsed = time.time() - start_time
     speed = done / elapsed if elapsed > 0 else 0
     remaining = (total - done) / speed if speed > 0 else 0
-
     bar = "█" * int(pct // 2) + "░" * (50 - int(pct // 2))
     print(
-        f"\r[{bar}] {pct:5.1f}%  |  {done}/{total} "
-        f"| ETA: {remaining:5.1f}s",
+        f"\r[{bar}] {pct:5.1f}% | {done}/{total} | ETA: {remaining:5.1f}s",
         end=""
     )
 
@@ -180,15 +176,13 @@ def run_engine():
 
     telegram(f"⏳ Downloading {len(tickers)} stocks… (multi-threaded + ETA)")
 
-    # MULTITHREADED + PROGRESS BAR
+    # MULTITHREADING
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(download_stock, sym): sym for sym in tickers}
         done = 0
-
         for future in as_completed(futures):
             sym = futures[future]
             sym, df, status = future.result()
-
             if status == "remove":
                 removed.append(sym)
             elif df is not None:
@@ -203,7 +197,7 @@ def run_engine():
     if removed:
         telegram(f"⚠️ Removed (failed twice): {', '.join(removed[:10])}…")
 
-    # PROCESS
+    # PROCESSING
     rows = []
     for sym, df in results:
         out = process(sym, df)
@@ -212,30 +206,16 @@ def run_engine():
 
     master = pd.DataFrame(rows)
     master = master.replace([np.inf, -np.inf], np.nan).fillna(0)
-    # ----------------------------------------------------
-# ENSURE combined_score EXISTS BEFORE RANKING
-required_factors = [
-    "momentum_score",
-    "value_score",
-    "quality_score",
-    "growth_score",
-    "volatility_score",
-    "volume_score",
-    "pattern_score"
-]
 
-available_factors = [f for f in required_factors if f in master.columns]
+    # ---------------------------
+    # SAFETY FALLBACK — only if missing
+    # ---------------------------
+    if "combined_score" not in master.columns:
+        master["combined_score"] = 0
 
-if not available_factors:
-    raise ValueError("No factor columns found to calculate combined_score")
-
-master["combined_score"] = master[available_factors].mean(axis=1)
-
-print("✔ combined_score created using:", available_factors)
-
-master["Rank"] = master["combined_score"].rank(
-    ascending=False, method="dense"
-).astype(int)
+    master["Rank"] = master["combined_score"].rank(
+        ascending=False, method="dense"
+    ).astype(int)
 
     # OUTPUT
     os.makedirs("output", exist_ok=True)
