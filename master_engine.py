@@ -212,7 +212,30 @@ def run_engine():
 
     master = pd.DataFrame(rows)
     master = master.replace([np.inf, -np.inf], np.nan).fillna(0)
+    # ----------------------------------------------------
+# ENSURE combined_score EXISTS BEFORE RANKING
+# ----------------------------------------------------
 
+required_factors = [
+    "momentum_score",
+    "value_score",
+    "quality_score",
+    "growth_score",
+    "volatility_score",
+    "volume_score",
+    "pattern_score"
+]
+
+# Keep only factors that exist in master
+available_factors = [f for f in required_factors if f in master.columns]
+
+if not available_factors:
+    raise ValueError("No factor columns found to calculate combined_score")
+
+# Create combined score as mean of available factor scores
+master["combined_score"] = master[available_factors].mean(axis=1)
+
+print("✔ combined_score created using:", available_factors)
     master["Rank"] = master["combined_score"].rank(
         ascending=False, method="dense"
     ).astype(int)
