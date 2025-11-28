@@ -4,11 +4,11 @@ import numpy as np
 from datetime import datetime
 import os
 import requests
-import json
 import time
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import ColorScaleRule
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 # ============================================================
 # TELEGRAM ALERTS
@@ -65,7 +65,7 @@ def save_to_cache(sym, df):
 
 
 # ============================================================
-# DOWNLOAD ONE STOCK WITH RETRY + CACHE + FAIL REMOVAL
+# DOWNLOAD 1 STOCK (CACHE + RETRIES + FAIL REMOVAL)
 # ============================================================
 def download_stock(sym):
     cached = load_from_cache(sym)
@@ -86,13 +86,13 @@ def download_stock(sym):
         time.sleep(1 + attempt)
 
         if fails == 2:
-            return sym, None, "remove"  # auto-remove
+            return sym, None, "remove"
 
     return sym, None, "fail"
 
 
 # ============================================================
-# PROCESS ONE STOCK
+# PROCESS 1 STOCK
 # ============================================================
 def process(sym, df):
     try:
@@ -131,13 +131,12 @@ def process(sym, df):
         )
 
         return out
-
     except:
         return None
 
 
 # ============================================================
-# PROGRESS BAR + ETA
+# PROGRESS BAR WITH ETA
 # ============================================================
 def print_progress(done, total, start_time):
     pct = (done / total) * 100
@@ -145,10 +144,7 @@ def print_progress(done, total, start_time):
     speed = done / elapsed if elapsed > 0 else 0
     remaining = (total - done) / speed if speed > 0 else 0
     bar = "█" * int(pct // 2) + "░" * (50 - int(pct // 2))
-    print(
-        f"\r[{bar}] {pct:5.1f}% | {done}/{total} | ETA: {remaining:5.1f}s",
-        end=""
-    )
+    print(f"\r[{bar}] {pct:5.1f}% | {done}/{total} | ETA: {remaining:4.1f}s", end="")
 
 
 # ============================================================
@@ -168,15 +164,16 @@ def apply_color(ws, col_letter, row_count):
 # MAIN ENGINE
 # ============================================================
 def run_engine():
+
     tickers = pd.read_excel("master_template.xlsx")["Symbol"].dropna().tolist()
 
     results = []
     removed = []
     start_time = time.time()
 
-    telegram(f"⏳ Downloading {len(tickers)} stocks… (multi-threaded + ETA)")
+    telegram(f"⏳ Downloading {len(tickers)} stocks… (multithreaded + ETA)")
 
-    # MULTITHREADING
+    # MULTITHREADED DOWNLOAD
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(download_stock, sym): sym for sym in tickers}
         done = 0
@@ -187,17 +184,16 @@ def run_engine():
                 removed.append(sym)
             elif df is not None:
                 results.append((sym, df))
-
             done += 1
             print_progress(done, len(tickers), start_time)
 
     print("\n")
-    telegram(f"📥 Completed: {len(results)}/{len(tickers)} stocks")
+    telegram(f"📥 Completed Downloading: {len(results)}/{len(tickers)}")
 
     if removed:
-        telegram(f"⚠️ Removed (failed twice): {', '.join(removed[:10])}…")
+        telegram(f"⚠️ Auto-removed (failed twice): {', '.join(removed[:10])}…")
 
-    # PROCESSING
+    # PROCESS STOCKS
     rows = []
     for sym, df in results:
         out = process(sym, df)
@@ -207,12 +203,20 @@ def run_engine():
     master = pd.DataFrame(rows)
     master = master.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # ---------------------------
-    # SAFETY FALLBACK — only if missing
-    # ---------------------------
+    # SAFETY 1: empty master
+    if master.empty:
+        telegram("❌ No valid stock data processed. Aborting cleanly.")
+        return
+
+    # SAFETY 2: Ensure columns exist
+    for col in ["short_term", "medium_term", "long_term"]:
+        if col not in master.columns:
+            master[col] = 0
+
     if "combined_score" not in master.columns:
         master["combined_score"] = 0
 
+    # RANKING
     master["Rank"] = master["combined_score"].rank(
         ascending=False, method="dense"
     ).astype(int)
@@ -224,11 +228,19 @@ def run_engine():
 
     with pd.ExcelWriter(outfile, engine="openpyxl") as writer:
         master.to_excel(writer, "Master", index=False)
-        master.sort_values("short_term", ascending=False).head(20).to_excel(writer, "Top20_ShortTerm", index=False)
-        master.sort_values("medium_term", ascending=False).head(20).to_excel(writer, "Top20_MediumTerm", index=False)
-        master.sort_values("long_term", ascending=False).head(20).to_excel(writer, "Top20_LongTerm", index=False)
+
+        if "short_term" in master.columns:
+            master.sort_values("short_term", ascending=False).head(20).to_excel(writer, "Top20_ShortTerm", index=False)
+
+        if "medium_term" in master.columns:
+            master.sort_values("medium_term", ascending=False).head(20).to_excel(writer, "Top20_MediumTerm", index=False)
+
+        if "long_term" in master.columns:
+            master.sort_values("long_term", ascending=False).head(20).to_excel(writer, "Top20_LongTerm", index=False)
+
         master.sort_values("combined_score", ascending=False).head(5).to_excel(writer, "Star_Top5", index=False)
 
+    # COLORING
     wb = load_workbook(outfile)
     ws = wb["Master"]
     rows_count = len(master) + 1
