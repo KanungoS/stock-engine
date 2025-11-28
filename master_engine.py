@@ -107,6 +107,13 @@ def run_engine():
     master = master.replace([np.inf, -np.inf], np.nan).fillna(0)
 
     # RANK BASED ON COMBINED SCORE
+    # Ensure combined_score exists (compute if missing)
+    if "combined_score" not in master.columns:
+    master["combined_score"] = (
+        master["short_term"] * 0.25 +
+        master["medium_term"] * 0.30 +
+        master["long_term"] * 0.45
+    )
     master["Rank"] = master["combined_score"].rank(
         ascending=False,
         method="dense"
