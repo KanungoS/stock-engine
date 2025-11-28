@@ -33,12 +33,21 @@ telegram("📡 Stock Engine Started (GitHub Actions)")
 def pct_change(df, days):
     if len(df) <= days:
         return np.nan
-    try:
-        return ((df["Close"].iloc[-1] - df["Close"].iloc[-days]) /
-                df["Close"].iloc[-days]) * 100
-    except:
-        return np.nan
 
+    try:
+        end = df["Close"].iloc[-1]
+
+        # Fix: safe lookup
+        start_index = max(0, len(df) - 1 - days)
+        start = df["Close"].iloc[start_index]
+
+        if pd.isna(start) or pd.isna(end):
+            return np.nan
+
+        return ((end - start) / start) * 100
+
+    except Exception:
+        return np.nan
 
 # ============================================================
 #                  PROCESS ONE STOCK
