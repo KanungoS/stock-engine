@@ -8,9 +8,11 @@ on:
 jobs:
   run-engine:
     runs-on: ubuntu-latest
+    timeout-minutes: 120        # avoids early timeouts
 
     steps:
-      - name: Checkout
+
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -20,17 +22,37 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Create cache directories
+        run: |
+          mkdir -p cache/raw_data
+          mkdir -p output
 
       - name: Run Engine
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          echo "🔄 Starting Engine..."
           python master_engine.py
+        continue-on-error: false
 
-      - name: Upload output
+      - name: Upload Excel Output
         uses: actions/upload-artifact@v4
         with:
           name: stock-output
           path: output/
+
+      - name: Upload Raw Data Cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-data
+          path: cache/raw_data/
+
+      - name: Upload Full Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-logs
+          path: engine.log
