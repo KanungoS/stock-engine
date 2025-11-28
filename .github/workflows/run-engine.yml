@@ -1,48 +1,57 @@
-name: Stock Engine Daily
+name: Daily Stock Engine (Auto run @ 16:30 IST)
 
 on:
-  workflow_dispatch:    # run manually
+  workflow_dispatch:   # manual trigger
   schedule:
-    - cron: "0 10 * * 1-5"   # runs every weekday 10:00 AM IST
+    - cron: '0 11 * * *'   # 11:00 UTC = 16:30 IST (runs daily)
 
 jobs:
   run-engine:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          else
+            python -m pip install --upgrade pip
+            pip install yfinance pandas numpy openpyxl XlsxWriter
+          fi
 
-    - name: Run Engine
-      run: |
-        echo "Starting Engine..."
-        python master_engine.py
+      - name: Run master engine
+        run: |
+          # ensure stocks.csv exists
+          if [ ! -f stocks.csv ]; then
+            echo "Error: stocks.csv not found" && exit 1
+          fi
 
-    # --------------------------------------------------------
-    # UPLOAD OUTPUT EXCEL FILES
-    # --------------------------------------------------------
-    - name: Upload Excel Output
-      uses: actions/upload-artifact@v4
-      with:
-        name: excel-output
-        path: ./*.xlsx
-        if-no-files-found: warn
+          python master_engine.py
 
-    # --------------------------------------------------------
-    # UPLOAD RAW DATA (CSV FILES)
-    # --------------------------------------------------------
-    - name: Upload Raw Data
-      uses: actions/upload-artifact@v4
-      with:
-        name: raw-data
-        path: raw_data/*.csv
-        if-no-files-found: warn
+      - name: Prepare artifact (zip dated folder)
+        run: |
+          ts="$(date +%F)"
+          mkdir -p output
+          # move produced xlsx files to output (if any)
+          mv -f ./*.xlsx output/ || true
+          # include raw_data if exists
+          if [ -d raw_data ]; then
+            mkdir -p output/raw_data
+            cp -r raw_data/* output/raw_data/ || true
+          fi
+          zip -r "excel-output-${ts}.zip" output || true
+          ls -la
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-output-${{ github.run_id }}-${{ github.run_number }}-${{ github.ref_name }}-${{ github.run_attempt }}
+          path: excel-output-*.zip
