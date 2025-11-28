@@ -9,7 +9,6 @@ from openpyxl import load_workbook
 from openpyxl.formatting.rule import ColorScaleRule
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
 # ============================================================
 # TELEGRAM ALERTS
 # ============================================================
@@ -221,7 +220,7 @@ def run_engine():
         ascending=False, method="dense"
     ).astype(int)
 
-    # OUTPUT
+        # OUTPUT
     os.makedirs("output", exist_ok=True)
     now = datetime.now().strftime("%Y%m%d_%H%M")
     outfile = f"output/master_output_{now}.xlsx"
