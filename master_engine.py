@@ -61,11 +61,13 @@ def calculate_scores(df):
 
         today = df.iloc[-1]
         def pct(days):
-            if len(df) > days:
-                return (today - df.iloc[-days]) / df.iloc[-days] * 100
-            return np.nan
-
-        return {
+            try:
+                if len(df) > days:
+                    return float((today - df.iloc[-days]) / df.iloc[-days] * 100)
+                return 0.0
+            except:
+                return 0.0
+         return {
             "price_today": today,
             "1w": pct(5),
             "1m": pct(21),
@@ -167,10 +169,10 @@ def run_engine(stock_list):
     master = pd.DataFrame(master)
 
     # ---- Scenario scores ----
-    master["score_short"] = master.apply(lambda r: scenario_score(r, "short"), axis=1)
-    master["score_medium"] = master.apply(lambda r: scenario_score(r, "medium"), axis=1)
-    master["score_long"] = master.apply(lambda r: scenario_score(r, "long"), axis=1)
-    master["star_score"] = master.apply(star_score, axis=1)
+    master["score_short"]  = master.apply(lambda r: float(scenario_score(r, "short")  or 0), axis=1)
+    master["score_medium"] = master.apply(lambda r: float(scenario_score(r, "medium") or 0), axis=1)
+    master["score_long"]   = master.apply(lambda r: float(scenario_score(r, "long")   or 0), axis=1)
+    master["star_score"]   = master.apply(lambda r: float(star_score(r)               or 0), axis=1)
 
     # ---- Create outputs ----
     master.to_excel("Master.xlsx", index=False)
