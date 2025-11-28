@@ -34,7 +34,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: excel-output
-        path: output/*.xlsx
+        path: ./*.xlsx
         if-no-files-found: warn
 
     # --------------------------------------------------------
