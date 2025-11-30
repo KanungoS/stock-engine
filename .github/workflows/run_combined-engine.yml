@@ -37,7 +37,7 @@ jobs:
     # 4. Run the combined engine
     # -------------------------------------------------
     - name: Run Combined Engine
-      run: python combined_engine.py
+      run: python run_combined_engine.py
 
     # -------------------------------------------------
     # 5. Commit output files back to repo
@@ -62,3 +62,4 @@ jobs:
       uses: ad-m/github-push-action@v0.8.0
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
+
