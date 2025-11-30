@@ -1,0 +1,39 @@
+name: Run Combined Stock Engine
+
+on:
+  schedule:
+    - cron: "5 3 * * *"     # Runs daily at 03:05 UTC (08:35 IST)
+  workflow_dispatch:        # Allows manual run
+
+jobs:
+  run-engine:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas numpy talib
+
+      - name: Run Combined Engine
+        run: python run_combined_engine.py
+
+      - name: Commit outputs
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add .
+          git commit -m "Updated outputs" || echo "No changes to commit"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
