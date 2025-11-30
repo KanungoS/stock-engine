@@ -10,64 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # ----------------------------------------------------
-    # 1. Checkout repository
-    # ----------------------------------------------------
+
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ----------------------------------------------------
-    # 2. Set up Python 3.11
-    # ----------------------------------------------------
     - name: Set up Python 3.11
       uses: actions/setup-python@v4
       with:
         python-version: 3.11
 
     # ----------------------------------------------------
-    # 3. Install TA-Lib system dependencies (Ubuntu)
+    # FIXED SECTION — install TA-Lib with Python wheel
     # ----------------------------------------------------
-    - name: Install TA-Lib system libraries
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libta-lib0 libta-lib-dev
-
-    # ----------------------------------------------------
-    # 4. Install Python dependencies
-    # ----------------------------------------------------
-    - name: Install Python dependencies
+    - name: Install TA-Lib Python wheel
       run: |
         pip install --upgrade pip
-        pip install pandas yfinance TA-Lib
+        pip install --no-cache-dir ta-lib-bin
 
-    # ----------------------------------------------------
-    # 5. Run full engine (fundamental + technical + combined)
-    # ----------------------------------------------------
+    - name: Install Python dependencies
+      run: |
+        pip install pandas yfinance
+
     - name: Run Combined Engine
       run: python run_combined_engine.py
 
-    # ----------------------------------------------------
-    # 6. Commit generated output CSV files
-    # ----------------------------------------------------
     - name: Commit outputs
       run: |
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Actions"
 
-        git add fundamental_scores.csv || true
-        git add technical_scores.csv || true
-        git add master_scores.csv || true
-        git add Top20_ShortTerm.csv || true
-        git add Top20_MediumTerm.csv || true
-        git add Top20_LongTerm.csv || true
-        git add Star_Top5.csv || true
-        git add Top20_Combined.csv || true
-
+        git add *.csv || true
         git commit -m "Updated analysis results" || echo "No changes to commit"
 
-    # ----------------------------------------------------
-    # 7. Push committed files back to GitHub
-    # ----------------------------------------------------
     - name: Push results
       uses: ad-m/github-push-action@v1
       with:
