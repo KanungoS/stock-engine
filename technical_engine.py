@@ -10,7 +10,8 @@ def compute_indicators(df):
     return df
 
 def main():
-    stocks = pd.read_csv("stocks.csv")["Symbol"].tolist()
+    df = pd.read_csv("stocks.csv")
+    stocks = df.iloc[:, 0].astype(str).tolist()
     final = []
 
     for ticker in stocks:
@@ -41,4 +42,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
