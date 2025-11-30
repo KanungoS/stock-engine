@@ -2,8 +2,8 @@ name: Run Combined Stock Engine
 
 on:
   schedule:
-    - cron: "5 3 * * *"     # Runs daily at 03:05 UTC (08:35 IST)
-  workflow_dispatch:        # Allows manual run
+    - cron: '5 3 * * *'
+  workflow_dispatch:
 
 jobs:
   run-engine:
@@ -13,10 +13,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -31,9 +31,9 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add .
-          git commit -m "Updated outputs" || echo "No changes to commit"
+          git commit -m "Auto update on $(date)" || echo "No changes"
 
       - name: Push changes
-        uses: ad-m/github-push-action@v0.8.0
+        uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
