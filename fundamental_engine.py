@@ -5,7 +5,7 @@ def main():
     print("Starting fundamental engine...")
 
     df = pd.read_csv("stocks.csv")
-    stocks = df["stock"].tolist()
+    stocks = df.iloc[:, 0].astype(str).tolist()
 
     data = []
 
@@ -45,3 +45,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
