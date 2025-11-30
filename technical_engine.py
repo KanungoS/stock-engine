@@ -1,32 +1,46 @@
-import pandas as pd
 import yfinance as yf
-import numpy as np
-import talib
+import pandas as pd
+import talib as ta
+
+def compute_indicators(df):
+    df["RSI"] = ta.RSI(df["Close"], timeperiod=14)
+    df["SMA50"] = ta.SMA(df["Close"], timeperiod=50)
+    df["SMA200"] = ta.SMA(df["Close"], timeperiod=200)
+    df["MACD"], df["MACD_signal"], df["MACD_hist"] = ta.MACD(df["Close"])
+    return df
 
 def main():
-    print("Starting technical engine...")
+    stocks = pd.read_csv("stocks.csv")["Symbol"].tolist()
+    final = []
 
-    df = pd.read_csv("master_scores.csv")
-    stocks = df["stock"].tolist()
-
-    short_scores = []
-    medium_scores = []
-    long_scores = []
-
-    for symbol in stocks:
-        print(f"Processing: {symbol}")
+    for ticker in stocks:
         try:
-            stock = yf.Ticker(symbol)
-            hist = stock.history(period="1y")
-
-            if len(hist) < 200:
-                print(f"Insufficient data for {symbol}")
-                short_scores.append(0)
-                medium_scores.append(0)
-                long_scores.append(0)
+            df = yf.download(ticker, period="1y", interval="1d", progress=False)
+            if df.empty:
                 continue
 
-            close = hist["Close"].values.astype(float)
+            df = compute_indicators(df)
+            last = df.iloc[-1]
+
+            final.append({
+                "stock": ticker,
+                "RSI": last["RSI"],
+                "SMA50": last["SMA50"],
+                "SMA200": last["SMA200"],
+                "MACD": last["MACD"],
+                "MACD_signal": last["MACD_signal"],
+                "MACD_hist": last["MACD_hist"],
+            })
+
+        except Exception as e:
+            print(f"Technical calc error for {ticker}: {e}")
+
+    out = pd.DataFrame(final)
+    out.to_csv("technical_scores.csv", index=False)
+    print("technical_scores.csv created successfully")
+
+if __name__ == "__main__":
+    main()
 
             rsi = talib.RSI(close, timeperiod=14)[-1]
             macd, signal, histo = talib.MACD(close)
@@ -70,3 +84,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
