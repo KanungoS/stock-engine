@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: "3.10"
@@ -21,20 +21,19 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install pandas yfinance pandas-ta
+        pip install pandas yfinance
 
-    - name: Run Engine
+    - name: Run full engine
       run: python run_combined_engine.py
 
-    - name: Commit Outputs
+    - name: Commit outputs
       run: |
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Actions"
-        
         git add *.csv || true
-        git commit -m "Updated analysis" || echo "No changes"
+        git commit -m "Updated results" || echo "No changes"
 
-    - name: Push
+    - name: Push results
       uses: ad-m/github-push-action@v1
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
