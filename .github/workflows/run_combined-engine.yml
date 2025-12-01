@@ -3,34 +3,36 @@ name: Run Combined Stock Engine
 on:
   workflow_dispatch:
   schedule:
-    - cron: "5 3 * * *"   # Auto-run daily at 08:35 IST
+    - cron: "5 3 * * *"
 
 jobs:
   run-engine:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04     # <<< PINNED OS (VERY IMPORTANT)
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Force Python 3.10
+    # FORCE Python 3.10 installation (works on Ubuntu 22.04)
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
+        architecture: 'x64'
 
-    # Install Python packages (NO TA-Lib)
+    - name: Verify Python version
+      run: python --version
+
+    # Install dependencies WITHOUT PyPI pandas-ta (BROKEN)
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install pandas yfinance
-        pip install pandas-ta==0.3.14b0
+        pip install git+https://github.com/twopirllc/pandas-ta.git
 
-    # Run combined engine
     - name: Run Combined Engine
       run: python run_combined_engine.py
 
-    # Commit output files
     - name: Commit outputs
       run: |
         git config --local user.email "actions@github.com"
@@ -39,7 +41,6 @@ jobs:
         git add *.csv || true
         git commit -m "Updated analysis results" || echo "No changes to commit"
 
-    # Push results
     - name: Push results
       uses: ad-m/github-push-action@v1
       with:
