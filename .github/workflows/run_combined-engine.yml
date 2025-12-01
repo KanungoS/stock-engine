@@ -10,56 +10,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # ----------------------------------------------------
-    # 1. Checkout repository
-    # ----------------------------------------------------
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ----------------------------------------------------
-    # 2. Set up Python 3.10 (required for pandas-ta)
-    # ----------------------------------------------------
+    # Force Python 3.10 (Stable for pandas-ta)
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
-        python-version: "3.10"
+        python-version: '3.10'
 
-    # ----------------------------------------------------
-    # 3. Install Python dependencies
-    # ----------------------------------------------------
+    # Install Python libraries (NO TA-Lib)
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install pandas yfinance pandas-ta
 
-    # ----------------------------------------------------
-    # 4. Run full engine (fundamental + technical + combined)
-    # ----------------------------------------------------
     - name: Run Combined Engine
       run: python run_combined_engine.py
 
-    # ----------------------------------------------------
-    # 5. Commit generated CSV outputs
-    # ----------------------------------------------------
     - name: Commit outputs
       run: |
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Actions"
 
-        git add fundamental_scores.csv || true
-        git add technical_scores.csv || true
-        git add master_scores.csv || true
-        git add Top20_ShortTerm.csv || true
-        git add Top20_MediumTerm.csv || true
-        git add Top20_LongTerm.csv || true
-        git add Star_Top5.csv || true
-        git add Top20_Combined.csv || true
-
+        git add *.csv || true
         git commit -m "Updated analysis results" || echo "No changes to commit"
 
-    # ----------------------------------------------------
-    # 6. Push results back to GitHub
-    # ----------------------------------------------------
     - name: Push results
       uses: ad-m/github-push-action@v1
       with:
