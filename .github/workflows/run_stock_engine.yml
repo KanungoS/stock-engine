@@ -3,60 +3,60 @@ name: Run Stock Engine (Fundamental + Technical)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"   # Runs daily at 08:30 IST (03:00 UTC)
+    # Runs daily at 08:30 IST → 03:00 UTC
+    - cron: "0 3 * * *"
 
 jobs:
   run-engine:
     runs-on: ubuntu-latest
 
     steps:
-    # -----------------------------
+    # ------------------------------------------------------
     # 1. Checkout Repository
-    # -----------------------------
+    # ------------------------------------------------------
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0   # Needed for pushing commits
 
-    # -----------------------------
+    # ------------------------------------------------------
     # 2. Set up Python
-    # -----------------------------
-    - name: Set up Python 3.11
+    # ------------------------------------------------------
+    - name: Set up Python 3.12
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: "3.12"
 
-    # -----------------------------
-    # 3. Install Dependencies
-    # -----------------------------
-    - name: Install Python dependencies
+    # ------------------------------------------------------
+    # 3. Install dependencies
+    # ------------------------------------------------------
+    - name: Install required Python packages
       run: |
-        pip install --upgrade pip
+        python -m pip install --upgrade pip
         pip install pandas yfinance numpy
 
-    # -----------------------------
-    # 4. Run Unified Stock Engine
-    # -----------------------------
-    - name: Run Unified Engine
-      run: python stock_engine.py
-
-    # -----------------------------
-    # 5. Commit Generated CSV Files
-    # -----------------------------
-    - name: Commit outputs
+    # ------------------------------------------------------
+    # 4. Run your Stock Engine script
+    # ------------------------------------------------------
+    - name: Run Stock Engine
       run: |
-        git config --local user.email "actions@github.com"
-        git config --local user.name "GitHub Actions"
+        python stock_engine.py
 
-        git add fundamental_scores.csv || true
-        git add technical_scores.csv || true
-        git add master_scores.csv || true
+    # ------------------------------------------------------
+    # 5. Commit & Push the CSV outputs
+    # ------------------------------------------------------
+    - name: Commit & Push results
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        
+        git add *.csv || true
 
-        git commit -m "Auto updated stock data" || echo "No changes to commit"
+        # If no changes, skip commit (prevents errors)
+        if git diff --cached --quiet; then
+          echo "No CSV changes to commit."
+          exit 0
+        fi
 
-    # -----------------------------
-    # 6. Push Back to GitHub
-    # -----------------------------
-    - name: Push results
-      uses: ad-m/github-push-action@v1
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: main
+        git commit -m "Daily automated stock data update"
+        git push
