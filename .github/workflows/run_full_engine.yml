@@ -1,0 +1,40 @@
+name: Run Full Stock Engine
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"   # 08:30 IST daily
+
+jobs:
+  run-engine:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        pip install yfinance pandas numpy
+
+    - name: Run full engine
+      run: python full_engine.py
+
+    - name: Commit updated CSV + ZIP
+      run: |
+        git config user.name "actions-user"
+        git config user.email "actions@github.com"
+        git add fundamental_scores.csv technical_scores.csv weekly_volatility.csv master_scores.csv stock_reports.zip
+        git commit -m "Auto-update full stock engine reports" || echo "No changes"
+        git push
+
+    - name: Upload ZIP artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: stock_reports
+        path: stock_reports.zip
