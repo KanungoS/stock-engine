@@ -24,7 +24,7 @@ jobs:
 
       - name: Run weekly volatility engine
         run: |
-          python weekly_volatility_engine.py
+          python volatility_engine.py
 
       - name: Commit updated weekly CSV
         run: |
