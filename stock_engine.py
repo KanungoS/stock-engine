@@ -1,6 +1,5 @@
 import pandas as pd
 import yfinance as yf
-import pandas_ta as ta
 import numpy as np
 import datetime
 
@@ -177,3 +176,4 @@ pd.DataFrame(volatility_rows).to_csv("weekly_volatility.csv", index=False)
 pd.DataFrame(combined_rows).to_csv("master_scores.csv", index=False)
 
 print("✔ ALL CSV FILES GENERATED SUCCESSFULLY!")
+
