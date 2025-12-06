@@ -3,7 +3,7 @@ name: Run Stock Engine
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"   # 8:30 AM IST
+    - cron: "0 3 * * *"   # Auto-run at 08:30 AM IST
 
 jobs:
   run-engine:
