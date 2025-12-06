@@ -21,7 +21,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install pandas yfinance pandas_ta numpy
+        pip install pandas yfinance numpy
 
     - name: Run Stock Engine
       run: python stock_engine.py
