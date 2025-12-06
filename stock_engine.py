@@ -160,12 +160,8 @@ for sym in symbols:
         combined_rows.append({
             **fundamental_rows[-1],
             **technical_rows[-1],
-            **volatility_rows[-1] if len(volatility_rows) == len(combined_rows)+1 else {}
-        })
-
-    except Exception as e:
+        except Exception as e:
         print(f"❌ ERROR: {sym} - {e}")
-
 
 # ===============================================================
 # EXPORT ALL FILES
@@ -176,4 +172,5 @@ pd.DataFrame(volatility_rows).to_csv("weekly_volatility.csv", index=False)
 pd.DataFrame(combined_rows).to_csv("master_scores.csv", index=False)
 
 print("✔ ALL CSV FILES GENERATED SUCCESSFULLY!")
+
 
