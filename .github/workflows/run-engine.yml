@@ -2,7 +2,8 @@ name: Run Stock Engine
 
 on:
   schedule:
-    - cron: "00 3 * * *"   # 08:30 AM IST (03:00 UTC)
+    # 08:30 AM IST = 03:00 UTC
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,26 +11,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # -----------------------------------------------------------
+    # 1. Checkout Repository
+    # -----------------------------------------------------------
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
 
+    # -----------------------------------------------------------
+    # 2. Setup Python + Cache Dependencies (optimization)
+    # -----------------------------------------------------------
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
+        cache: "pip"
 
     - name: Install dependencies
       run: |
+        pip install --upgrade pip
         pip install yfinance pandas numpy
 
+    # -----------------------------------------------------------
+    # 3. Run the Stock Engine Script
+    # -----------------------------------------------------------
     - name: Run Stock Engine
       run: |
         python stock_engine.py
 
+    # -----------------------------------------------------------
+    # 4. Commit & Push CSV Outputs (safe commit)
+    # -----------------------------------------------------------
     - name: Commit & Push Results
       run: |
+        git config --global user.name "github-actions"
         git config --global user.email "github-actions@github.com"
-        git config --global user.name "GitHub Actions"
+        
         git add output/*.csv
-        git commit -m "Auto-update CSV files" || echo "No changes"
-        git push
+        
+        # Avoid failing when no changes
+        git commit -m "Auto-update CSV files" || echo "No changes to commit"
+        
+        git push || echo "No changes to push"
