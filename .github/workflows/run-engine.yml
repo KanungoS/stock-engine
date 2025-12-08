@@ -27,7 +27,7 @@ jobs:
         run: python master_engine.py
 
       - name: Upload master sheet
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: master_sheet
           path: master_sheet.xlsx
