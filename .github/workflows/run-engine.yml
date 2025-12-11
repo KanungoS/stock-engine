@@ -1,8 +1,13 @@
-name: Run Stock Engine
+name: Run Stock Engine (Morning + EOD)
 
 on:
   schedule:
-    - cron: "0 3 * * *"   # 08:30 AM IST
+    # MORNING RUN — 08:30 IST (03:00 UTC)
+    - cron: "0 3 * * *"
+
+    # EOD RUN — 15:30 IST (10:00 UTC)
+    - cron: "0 10 * * *"
+
   workflow_dispatch:
 
 jobs:
@@ -17,22 +22,32 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
-        cache: "pip"
+        cache: pip
 
     - name: Install dependencies
       run: |
         pip install --upgrade pip
         pip install yfinance pandas numpy
 
+    - name: Determine Run Mode
+      id: runmode
+      run: |
+        if [ "$(date -u +%H)" = "03" ]; then
+          echo "mode=MORNING" >> $GITHUB_OUTPUT
+        else
+          echo "mode=EOD" >> $GITHUB_OUTPUT
+        fi
+
     - name: Run Stock Engine
       run: |
+        export RUN_MODE=${{ steps.runmode.outputs.mode }}
         python stock_engine.py
 
-    - name: Commit & Push Results
+    - name: Commit & Push Outputs
       run: |
         git config --global user.name "github-actions"
         git config --global user.email "github-actions@github.com"
 
         git add output/*.csv
-        git commit -m "Auto-update CSV files" || echo "No changes"
+        git commit -m "Auto update CSVs" || echo "No changes"
         git push || echo "No changes"
