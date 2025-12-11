@@ -1,19 +1,25 @@
-name: Run Stock Engine
+name: Stock Engine (Automated + Manual Modes)
 
 on:
   schedule:
-    # 08:30 IST = 03:00 UTC
+    # Auto 08:30 IST → 03:00 UTC
     - cron: "0 3 * * *"
-    # 15:30 IST = 10:00 UTC
+    # Auto 15:30 IST → 10:00 UTC
     - cron: "0 10 * * *"
+
   workflow_dispatch:
+    inputs:
+      RUN_MODE:
+        description: "Choose: 0830, 1530, BOTH, COMPARE"
+        required: false
+        default: "AUTO"
 
 jobs:
   run-engine:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repo
+    - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Setup Python
@@ -22,19 +28,45 @@ jobs:
         python-version: "3.11"
 
     - name: Install Dependencies
-      run: pip install yfinance pandas numpy pytz
+      run: |
+        pip install --upgrade pip
+        pip install yfinance pandas numpy pytz
+
+    - name: Determine Run Mode
+      id: mode
+      run: |
+        echo "----- Determining Run Mode -----"
+        
+        # If manual run → use user choice
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          mode="${{ github.event.inputs.RUN_MODE }}"
+          echo "run_mode=$mode" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Auto-run logic (scheduled)
+        utc_hour=$(date -u +%H)
+
+        if [ "$utc_hour" = "03" ]; then
+          echo "run_mode=0830" >> $GITHUB_OUTPUT
+        elif [ "$utc_hour" = "10" ]; then
+          echo "run_mode=1530" >> $GITHUB_OUTPUT
+        else
+          echo "run_mode=0830" >> $GITHUB_OUTPUT
+        fi
 
     - name: Run Stock Engine
-      env:
-        GITHUB_ACTIONS: true
-      run: python stock_engine.py
-
-    - name: Commit Outputs
       run: |
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions"
+        export RUN_MODE=${{ steps.mode.outputs.run_mode }}
+        echo "RUN_MODE=$RUN_MODE"
+        python stock_engine.py
 
-        git add output/*
+    - name: Commit & Push Outputs
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
 
-        git commit -m "Daily auto-update" || echo "No changes"
+        git add output/* || true
+
+        git commit -m "Update CSV outputs (${{ steps.mode.outputs.run_mode }})" || echo "No changes"
         git push || true
