@@ -1,53 +1,58 @@
-name: Run Stock Engine (Morning + EOD)
+name: Stock Engine (Morning + EOD)
 
 on:
   schedule:
-    # MORNING RUN — 08:30 IST (03:00 UTC)
-    - cron: "0 3 * * *"
-
-    # EOD RUN — 15:30 IST (10:00 UTC)
-    - cron: "0 10 * * *"
-
-  workflow_dispatch:
+    - cron: "0 3 * * *"   # 08:30 IST Morning
+    - cron: "0 10 * * *"  # 15:30 IST EOD
+  workflow_dispatch:      # Manual run
 
 jobs:
   run-engine:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
 
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
-        cache: pip
 
-    - name: Install dependencies
+    - name: Install Dependencies
       run: |
         pip install --upgrade pip
         pip install yfinance pandas numpy
 
     - name: Determine Run Mode
-      id: runmode
+      id: rm
       run: |
-        if [ "$(date -u +%H)" = "03" ]; then
-          echo "mode=MORNING" >> $GITHUB_OUTPUT
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          now_utc=$(date -u +%H)
+          # 3:30 PM IST = 10 UTC
+          if [ "$now_utc" -ge 10 ]; then
+            echo "mode=EOD" >> $GITHUB_OUTPUT
+          else
+            echo "mode=MORNING" >> $GITHUB_OUTPUT
+          fi
         else
-          echo "mode=EOD" >> $GITHUB_OUTPUT
+          hour=$(date -u +%H)
+          if [ "$hour" = "03" ]; then
+            echo "mode=MORNING" >> $GITHUB_OUTPUT
+          else
+            echo "mode=EOD" >> $GITHUB_OUTPUT
+          fi
         fi
 
-    - name: Run Stock Engine
+    - name: Run Engine
       run: |
-        export RUN_MODE=${{ steps.runmode.outputs.mode }}
+        export RUN_MODE=${{ steps.rm.outputs.mode }}
         python stock_engine.py
 
-    - name: Commit & Push Outputs
+    - name: Push Outputs
       run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "github-actions@github.com"
-
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
         git add output/*.csv
-        git commit -m "Auto update CSVs" || echo "No changes"
+        git commit -m "Update CSVs" || echo "No changes"
         git push || echo "No changes"
