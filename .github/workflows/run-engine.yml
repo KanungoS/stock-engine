@@ -20,7 +20,7 @@ jobs:
         fetch-depth: 1
 
     # -----------------------------------------------------------
-    # 2. Setup Python + Cache Dependencies (optimization)
+    # 2. Setup Python + Cache Dependencies
     # -----------------------------------------------------------
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -34,14 +34,14 @@ jobs:
         pip install yfinance pandas numpy
 
     # -----------------------------------------------------------
-    # 3. Run the Stock Engine Script
+    # 3. Run the Engine
     # -----------------------------------------------------------
     - name: Run Stock Engine
       run: |
         python stock_engine.py
 
     # -----------------------------------------------------------
-    # 4. Commit & Push CSV Outputs (safe commit)
+    # 4. Commit & Push CSVs
     # -----------------------------------------------------------
     - name: Commit & Push Results
       run: |
@@ -50,7 +50,6 @@ jobs:
         
         git add output/*.csv
         
-        # Avoid failing when no changes
         git commit -m "Auto-update CSV files" || echo "No changes to commit"
         
         git push || echo "No changes to push"
